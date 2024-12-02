@@ -1066,3 +1066,53 @@ BEGIN
           AND spm.MaKichThuoc = i.MaKichThuoc
     );
 END;
+
+
+----BACKUP DATABASE---
+
+CREATE PROCEDURE BackupDatabase
+    @DatabaseName NVARCHAR(100), -- Tên cơ sở dữ liệu
+    @BackupFilePath NVARCHAR(MAX) -- Đường dẫn file sao lưu
+AS
+BEGIN
+    BEGIN TRY
+        -- Thực hiện sao lưu cơ sở dữ liệu
+        DECLARE @BackupCommand NVARCHAR(MAX);
+        SET @BackupCommand = 'BACKUP DATABASE ' + QUOTENAME(@DatabaseName) + ' TO DISK = @BackupFilePath';
+        EXEC sp_executesql @BackupCommand, N'@BackupFilePath NVARCHAR(MAX)', @BackupFilePath;
+        PRINT N'Sao lưu thành công!';
+    END TRY
+    BEGIN CATCH
+        PRINT N'Lỗi xảy ra trong quá trình sao lưu: ' + ERROR_MESSAGE();
+    END CATCH
+END;
+GO
+
+---RESTORE DATABASE---
+
+CREATE PROCEDURE RestoreDatabase
+    @DatabaseName NVARCHAR(100), -- Tên cơ sở dữ liệu
+    @BackupFilePath NVARCHAR(MAX) -- Đường dẫn file sao lưu
+AS
+BEGIN
+    BEGIN TRY
+        -- Đặt cơ sở dữ liệu ở chế độ đơn người dùng để ngừng kết nối
+        DECLARE @RestoreCommand NVARCHAR(MAX);
+        SET @RestoreCommand = 'ALTER DATABASE ' + QUOTENAME(@DatabaseName) + ' SET SINGLE_USER WITH ROLLBACK IMMEDIATE';
+        EXEC sp_executesql @RestoreCommand;
+
+        -- Khôi phục cơ sở dữ liệu
+        SET @RestoreCommand = 'RESTORE DATABASE ' + QUOTENAME(@DatabaseName) + ' FROM DISK = @BackupFilePath WITH REPLACE';
+        EXEC sp_executesql @RestoreCommand, N'@BackupFilePath NVARCHAR(MAX)', @BackupFilePath;
+
+        -- Đặt cơ sở dữ liệu lại chế độ đa người dùng
+        SET @RestoreCommand = 'ALTER DATABASE ' + QUOTENAME(@DatabaseName) + ' SET MULTI_USER';
+        EXEC sp_executesql @RestoreCommand;
+
+        PRINT 'Khôi phục cơ sở dữ liệu thành công!';
+    END TRY
+    BEGIN CATCH
+        PRINT N'Lỗi xảy ra trong quá trình khôi phục: ' + ERROR_MESSAGE();
+    END CATCH
+END;
+GO
