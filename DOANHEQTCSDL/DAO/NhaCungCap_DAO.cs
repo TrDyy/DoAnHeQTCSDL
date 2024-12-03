@@ -1,11 +1,11 @@
-﻿using DOANHEQTCSDL.DTO;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Data;
-using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
+using DOANHEQTCSDL.DTO;
+using System.Data;
 using System.Threading.Tasks;
+using System.Data.SqlClient;
 
 namespace DOANHEQTCSDL.DAO
 {
@@ -26,14 +26,14 @@ namespace DOANHEQTCSDL.DAO
         {
             List<NhaCungCap> list = new List<NhaCungCap>();
 
-            string query = "SELECT MaNhaCungCap, TenNhaCungCap, DiaChi, DienThoai, Email FROM NhaCungCap";
+            string query = "EXEC GetNhaCungCap";
 
             DataTable data = DataProvider.Instance.ExecuteQuery(query);
 
             foreach (DataRow row in data.Rows)
             {
-                NhaCungCap item = new NhaCungCap(row);
-                list.Add(item);
+                NhaCungCap ncc = new NhaCungCap(row);
+                list.Add(ncc);
             }
 
             return list;
@@ -69,10 +69,18 @@ namespace DOANHEQTCSDL.DAO
         // Cập nhật thông tin nhà cung cấp
         public bool UpdateNhaCungCap(int maNCC, string tenNCC, string diaChi, string sdt, string email)
         {
-            string query = string.Format("UPDATE NhaCungCap SET TenNhaCungCap = N'{0}', DiaChi = N'{1}', DienThoai = N'{2}', Email = N'{3}' WHERE MaNhaCungCap = {4}",
-                                         tenNCC, diaChi, sdt, email, maNCC);
+            string query = "EXEC sp_UpdateNhaCungCap @MaNhaCungCap, @TenNhaCungCap, @DiaChi, @DienThoai, @Email";
 
-            int result = DataProvider.Instance.NonExecuteQuery(query);
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                    new SqlParameter("@MaNhaCungCap", maNCC),
+                    new SqlParameter("@TenNhaCungCap", tenNCC),
+                    new SqlParameter("@DiaChi", diaChi),
+                    new SqlParameter("@DienThoai", sdt),
+                    new SqlParameter("@Email", email)
+            };
+
+            int result = DataProvider.Instance.ExecuteNonQuery(query, parameters);
 
             return result > 0;
         }
@@ -80,8 +88,14 @@ namespace DOANHEQTCSDL.DAO
         // Xóa nhà cung cấp
         public bool DeleteNhaCungCap(int maNhaCungCap)
         {
-            string query = string.Format("DELETE FROM NhaCungCap WHERE MaNhaCungCap = {0}", maNhaCungCap);
-            int result = DataProvider.Instance.NonExecuteQuery(query);
+            string query = "EXEC sp_DeleteNhaCungCap @MaNhaCungCap";
+
+            SqlParameter[] parameters = new SqlParameter[]
+                {
+                    new SqlParameter("@MaNhaCungCap", maNhaCungCap)
+                };
+
+            int result = DataProvider.Instance.ExecuteNonQuery(query, parameters);
 
             return result > 0;
         }

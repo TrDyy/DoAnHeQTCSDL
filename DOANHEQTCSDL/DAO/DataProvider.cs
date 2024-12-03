@@ -25,7 +25,7 @@ namespace DOANHEQTCSDL.DAO
         private DataProvider() { }
 
 
-        string connectstr = "Data Source=NTDyy;Initial Catalog=DoAnHeQTCSDL02;Integrated Security=True";
+        string connectstr = "Data Source=NTDyy;Initial Catalog=QuanLyShopQuanAo_HeQTCSDL;Integrated Security=True";
 
         public DataTable ExecuteQuery(string query, object[] parameter = null)
         {

@@ -47,7 +47,8 @@ namespace DOANHEQTCSDL
             dgv_phieuNhap.Columns["TongTien"].HeaderText = "Tổng Tiền";
 
             dgv_phieuNhap.Columns["NgayNhap"].DefaultCellStyle.Format = "dd/MM/yyyy";
-            dgv_phieuNhap.Columns["TongTien"].DefaultCellStyle.Format = "C2"; // Định dạng tiền tệ
+            dgv_phieuNhap.Columns["TongTien"].DefaultCellStyle.Format = "C0";
+            dgv_phieuNhap.Columns["TongTien"].DefaultCellStyle.FormatProvider = new System.Globalization.CultureInfo("vi-VN");// Định dạng tiền tệ
         }
 
 
@@ -111,7 +112,8 @@ namespace DOANHEQTCSDL
                 dgv_chiTietPhieuNhap.Columns["GiaNhap"].HeaderText = "Giá Nhập";
 
                 // Định dạng cột tiền tệ
-                dgv_chiTietPhieuNhap.Columns["GiaNhap"].DefaultCellStyle.Format = "C2"; // Định dạng tiền tệ
+                dgv_chiTietPhieuNhap.Columns["GiaNhap"].DefaultCellStyle.Format = "C0";
+                dgv_chiTietPhieuNhap.Columns["GiaNhap"].DefaultCellStyle.FormatProvider = new System.Globalization.CultureInfo("vi-VN");
             }
             else
             {
@@ -186,14 +188,10 @@ namespace DOANHEQTCSDL
         private void btnThemPN_Click(object sender, EventArgs e)
         {
             ThemPhieuNhap gd = new ThemPhieuNhap();
-            gd.FormClosed += (s, args) => this.Close();
             gd.Show();
-            this.Hide();
+           
         }
 
-        private void btnThoat_Click(object sender, EventArgs e)
-        {
-
-        }
+       
     }
 }

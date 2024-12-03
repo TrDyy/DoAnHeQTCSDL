@@ -206,12 +206,14 @@ VALUES
 -- Thêm dữ liệu vào bảng VaiTro
 INSERT INTO VaiTro (TenVaiTro) VALUES
 (N'Quản trị viên'),
-(N'Nhân viên');
+(N'Nhân viên'),
+(N'Khách hàng');
 
 -- Thêm dữ liệu vào bảng NguoiDung
 INSERT INTO NguoiDung (TenDangNhap, MatKhau, HoTen, DienThoai, MaVaiTro) VALUES
 (N'admin', N'password123', N'Nguyễn Văn A', N'0901234567', 1),
-(N'nhanvien1', N'password456', N'Trần Thị B', N'0907654321', 2);
+(N'nhanvien1', N'password456', N'Trần Thị B', N'0907654321', 2),
+(N'susu', N'susu123', N'Lê Thị C', N'0111222333', 3);
 
 -- Thêm dữ liệu vào bảng KhachHang
 INSERT INTO KhachHang (Ho, Ten, DienThoai, DiaChiDayDu, MaNguoiDung) VALUES
@@ -220,22 +222,21 @@ INSERT INTO KhachHang (Ho, Ten, DienThoai, DiaChiDayDu, MaNguoiDung) VALUES
 (N'Trần', N'Văn D', N'0912345679', N'Số 456, Đường DEF, Quận 2', 2);
 
 -- Thêm dữ liệu vào bảng DonHang
-INSERT INTO DonHang (MaKhachHang, NgayDat, DiaChiGiaoHang, TrangThaiDonHang)
+INSERT INTO  DonHang (MaKhachHang, NgayDat, DiaChiGiaoHang, TrangThaiDonHang)
 VALUES
-(1, '2024-12-02', '123 Đường ABC, Quận 1, TP.HCM', 'Đang xử lý'),
-(2, '2024-12-01', '456 Đường XYZ, Quận 2, TP.HCM', 'Đang giao'),
-(3, '2024-12-03', '789 Đường DEF, Quận 3, TP.HCM', 'Đã hoàn thành');
+(1, '2024-12-02', N'123 Đường ABC, Quận 1, TP.HCM', 'Đang chờ xử lý'),
+(2, '2024-12-01', N'456 Đường XYZ, Quận 2, TP.HCM', 'Đang chờ xử lý'),
+(3, '2024-12-03', N'Mua tại cửa hàng', 'Hoàn thành');
 
 -- Thêm dữ liệu vào bảng ChiTietDonHang
 INSERT INTO ChiTietDonHang (MaDonHang, MaSanPham, MaMauSac, MaKichThuoc, SoLuong, ThanhTien)
 VALUES
-(1, 1, 1, 1, 2, 500000),   
+(1, 1, 1, 3, 2, 500000),   
 (1, 2, 2, 1, 1, 300000),   
 (2, 3, 1, 2, 3, 1200000),
 (2, 1, 3, 2, 2, 600000),   
 (3, 2, 1, 3, 1, 450000),   
 (3, 3, 2, 3, 2, 900000);   
-
 
 -- Thêm dữ liệu vào bảng CanCuocCongNhan
 INSERT INTO CanCuocCongNhan (SoCanCuoc, MaNguoiDung, NgayCap, NoiCap) VALUES
@@ -558,20 +559,6 @@ BEGIN
 END
 GO
 
---cập nhật trạng thái đơn hàng khi khách hàng hủy đơn
-CREATE TRIGGER trgCapNhatTrangThaiHuyDon
-ON DonHang
-AFTER UPDATE
-AS
-BEGIN
-    IF EXISTS (SELECT * FROM inserted WHERE TrangThaiDonHang = N'Hủy')
-    BEGIN
-        UPDATE DonHang
-        SET TrangThaiDonHang = N'Đã hủy'
-        WHERE MaDonHang IN (SELECT MaDonHang FROM inserted);
-    END
-END
-GO
 
 
 --duyệt qua danh sách khách hàng và gửi email chúc mừng
@@ -714,7 +701,6 @@ BEGIN
     FROM NhaCungCap;
 END;
 
-EXEC GetNhaCungCap;
 
 -- Thêm nhà cung cấp bằng thủ tục:
 GO
@@ -785,7 +771,6 @@ RETURN
         CanCuocCongNhan cccd ON nd.MaNguoiDung = cccd.MaNguoiDung
 );
 
-SELECT * FROM GetNguoiDungDetails();
 
 --Thêm người dùng bằng thủ tục kết hợp transaction: 
 -- Gọi thủ tục AddNguoiDungWithVaiTroAndCanCuoc với các tham số
@@ -935,55 +920,281 @@ END;
 -- Trigger: Cập nhật số lượng sản phẩm trong kho khi đơn hàng được tạo
 CREATE TRIGGER CapNhatSoLuongTonSauDonHang
 ON ChiTietDonHang
-AFTER INSERT
+AFTER INSERT, DELETE, UPDATE
 AS
 BEGIN
-    DECLARE @MaSanPham INT
-	DECLARE @SoLuongMua INT 
-	DECLARE @SoLuongTon INT 
-	--Trường hợp tạo nhiều đơn hàng cùng lúc
-	DECLARE duyetTungPT CURSOR FOR
-    SELECT MaSanPham, SoLuong FROM inserted;
-    OPEN duyetTungPT;
-    FETCH NEXT FROM duyetTungPT INTO @MaSanPham, @SoLuongMua;
-    WHILE @@FETCH_STATUS = 0
+    SET NOCOUNT ON;
+
+    -- Cập nhật giảm số lượng tồn khi có INSERT
+    IF EXISTS (SELECT * FROM inserted) AND NOT EXISTS (SELECT * FROM deleted)
     BEGIN
-        SELECT @SoLuongTon = SoLuong FROM SanPhamMauSacKichThuoc WHERE MaSanPham = @MaSanPham;
-        IF @SoLuongTon < @SoLuongMua
-        BEGIN
-            PRINT N'Không đủ số lượng';
-            ROLLBACK TRAN;
-        END
-        ELSE
-        BEGIN
-            UPDATE SanPhamMauSacKichThuoc
-            SET SoLuong = SoLuong - @SoLuongMua
-            WHERE MaSanPham = @MaSanPham;
-        END
-        FETCH NEXT FROM duyetTungPT INTO @MaSanPham, @SoLuongMua;
+        UPDATE S
+        SET SoLuong = S.SoLuong - I.SoLuong
+        FROM SanPhamMauSacKichThuoc S
+        INNER JOIN inserted I ON S.MaSanPham = I.MaSanPham
+                              AND S.MaMauSac = I.MaMauSac
+                              AND S.MaKichThuoc = I.MaKichThuoc;
     END
-    CLOSE duyetTungPT;
-    DEALLOCATE duyetTungPT;
+
+    -- Cập nhật tăng số lượng tồn khi có DELETE
+    IF NOT EXISTS (SELECT * FROM inserted) AND EXISTS (SELECT * FROM deleted)
+    BEGIN
+        UPDATE S
+        SET SoLuong = S.SoLuong + D.SoLuong
+        FROM SanPhamMauSacKichThuoc S
+        INNER JOIN deleted D ON S.MaSanPham = D.MaSanPham
+                              AND S.MaMauSac = D.MaMauSac
+                              AND S.MaKichThuoc = D.MaKichThuoc;
+    END
+
+    -- Xử lý trường hợp UPDATE (chuyển đổi sản phẩm hoặc thay đổi số lượng)
+    IF EXISTS (SELECT * FROM inserted) AND EXISTS (SELECT * FROM deleted)
+    BEGIN
+        -- Tăng số lượng tồn của sản phẩm cũ
+        UPDATE S
+        SET SoLuong = S.SoLuong + D.SoLuong
+        FROM SanPhamMauSacKichThuoc S
+        INNER JOIN deleted D ON S.MaSanPham = D.MaSanPham
+                              AND S.MaMauSac = D.MaMauSac
+                              AND S.MaKichThuoc = D.MaKichThuoc;
+
+        -- Giảm số lượng tồn của sản phẩm mới
+        UPDATE S
+        SET SoLuong = S.SoLuong - I.SoLuong
+        FROM SanPhamMauSacKichThuoc S
+        INNER JOIN inserted I ON S.MaSanPham = I.MaSanPham
+                              AND S.MaMauSac = I.MaMauSac
+                              AND S.MaKichThuoc = I.MaKichThuoc;
+    END
 END;
 
--- Cursor: Duyệt qua danh sách đơn hàng và in thông tin chi tiết
-DECLARE @MaDonHang INT, @MaSanPham INT, @SoLuong INT, @ThanhTien DECIMAL(10, 2);
-DECLARE conTro CURSOR FOR 
-SELECT MaDonHang, MaSanPham, SoLuong, ThanhTien
-FROM ChiTietDonHang;
 
-OPEN conTro;
-FETCH NEXT FROM conTro INTO @MaDonHang, @MaSanPham, @SoLuong, @ThanhTien;
-WHILE @@FETCH_STATUS = 0
+--Gộp họ tên khách hàng
+CREATE FUNCTION HoVaTen
+(
+    @Ho NVARCHAR(50),
+    @Ten NVARCHAR(50)
+)
+RETURNS NVARCHAR(100)
+AS
 BEGIN
-    PRINT 'MaDonHang: ' + CAST(@MaDonHang AS NVARCHAR(10)) + 
-          ', MaSanPham: ' + CAST(@MaSanPham AS NVARCHAR(10)) + 
-          ', SoLuong: ' + CAST(@SoLuong AS NVARCHAR(10)) + 
-          ', ThanhTien: ' + CAST(@ThanhTien AS NVARCHAR(10));
-    FETCH NEXT FROM conTro INTO @MaDonHang, @MaSanPham, @SoLuong, @ThanhTien;
+    RETURN CONCAT(@Ho, ' ', @Ten)
+END
+
+---Lấy số lượng trong SanPhamMauSacKichThuoc
+CREATE PROC LaySoLuongTonKho @MaSanPham INT, @MauSac NVARCHAR(50), @KichThuoc NVARCHAR(50)
+AS
+BEGIN
+	SELECT SoLuong
+	FROM SanPhamMauSacKichThuoc AS LK
+	JOIN MauSac MS ON MS.MaMauSac = LK.MaMauSac
+	JOIN KichThuoc KT ON KT.MaKichThuoc = LK.MaKichThuoc
+	WHERE LK.MaSanPham = @MaSanPham AND MS.TenMauSac = @MauSac AND KT.TenKichThuoc = @KichThuoc
+END
+
+--Lấy giỏ hàng cho khách
+CREATE PROC LayThongTinDonHangChoKhach @MaSanPham INT
+AS
+BEGIN
+	SELECT DISTINCT SP.TenSanPham, SP.GiaBan, MS.TenMauSac, KT.TenKichThuoc, SP.HinhAnh 
+	FROM SanPhamMauSacKichThuoc LK
+	JOIN MauSac MS ON MS.MaMauSac = LK.MaMauSac
+	JOIN KichThuoc KT ON KT.MaKichThuoc = LK.MaKichThuoc
+	JOIN SanPham SP ON SP.MaSanPham = LK.MaSanPham
+	WHERE LK.MaSanPham = @MaSanPham
+END
+
+--Lấy mã sản phẩm
+CREATE PROC LayMaSanPham
+AS
+BEGIN
+	SELECT MaSanPham FROM SanPham
+END
+
+---Lấy mã đơn hàng
+CREATE PROC LayMaDonHang
+AS
+BEGIN
+	Select MaDonHang From DonHang
+END
+
+
+---Lấy thông tin đơn hàng
+CREATE PROCEDURE LayThongTinDonHang
+AS
+BEGIN
+    -- Tạo bảng tạm để lưu kết quả tạm thời
+    CREATE TABLE #ThongTinDonHang (
+        MaDonHang INT,
+        HoVaTen NVARCHAR(100),
+        NgayDat DATE,
+        DiaChiGiaoHang NVARCHAR(255),
+        ThanhTien DECIMAL(18, 2),
+        TrangThaiDonHang NVARCHAR(50)
+    );
+
+    -- Lấy thông tin đơn hàng và tổng tiền từ các bảng
+    INSERT INTO #ThongTinDonHang (MaDonHang, HoVaTen, NgayDat, DiaChiGiaoHang, ThanhTien, TrangThaiDonHang)
+    SELECT 
+        DH.MaDonHang,
+        dbo.HoVaTen(KH.Ho, KH.Ten) AS HoVaTen,
+        DH.NgayDat,
+        DH.DiaChiGiaoHang,
+        SUM(CTDH.ThanhTien) AS ThanhTien,
+        DH.TrangThaiDonHang
+    FROM 
+        DonHang DH
+    JOIN 
+        KhachHang KH ON KH.MaKhachHang = DH.MaKhachHang
+    JOIN 
+        ChiTietDonHang CTDH ON CTDH.MaDonHang = DH.MaDonHang
+    GROUP BY 
+        DH.MaDonHang, dbo.HoVaTen(KH.Ho, KH.Ten), DH.NgayDat, DH.DiaChiGiaoHang, DH.TrangThaiDonHang;
+
+    -- Xuất kết quả từ bảng tạm
+    SELECT * FROM #ThongTinDonHang ORDER BY  MaDonHang;
+
+    -- Dọn dẹp bảng tạm
+    DROP TABLE #ThongTinDonHang;
 END;
-CLOSE conTro;
-DEALLOCATE conTro;
+
+---Cập nhật trạng thái đơn hàng
+CREATE PROCEDURE CapNhatDonHang
+    @MaDonHang NVARCHAR(50),
+    @TrangThai NVARCHAR(50)
+AS
+BEGIN
+    UPDATE DonHang
+    SET TrangThaiDonHang = @TrangThai
+    WHERE MaDonHang = @MaDonHang;
+END
+
+--Hủy đơn hàng khi chọn trạng thái là "Đã hủy"---
+CREATE PROCEDURE HuyDonHang @MaDonHang NVARCHAR(50)
+AS
+BEGIN
+   -- Cập nhật lại số lượng sản phẩm
+    UPDATE sp
+    SET sp.SoLuong = sp.SoLuong + ctdh.SoLuong
+	FROM SanPhamMauSacKichThuoc sp
+    INNER JOIN ChiTietDonHang ctdh 
+    ON sp.MaSanPham = ctdh.MaSanPham 
+    AND sp.MaMauSac = ctdh.MaMauSac 
+    AND sp.MaKichThuoc = ctdh.MaKichThuoc
+	WHERE ctdh.MaDonHang = @MaDonHang;
+
+	DELETE FROM ChiTietDonHang WHERE MaDonHang = @MaDonHang;
+    DELETE FROM DonHang WHERE MaDonHang = @MaDonHang;
+END;
+
+--Lấy chi tiết đơn hàng (theo tên)--
+CREATE PROC LayChiTietDonHang @MaDonHang INT
+AS
+BEGIN
+	SELECT MaDonHang, SP.TenSanPham, MS.TenMauSac, KT.TenKichThuoc, SoLuong, ThanhTien FROM ChiTietDonHang CTDH
+	JOIN SanPham SP ON SP.MaSanPham = CTDH.MaSanPham
+	JOIN MauSac MS ON MS.MaMauSac = CTDH.MaMauSac
+	JOIN KichThuoc KT ON KT.MaKichThuoc = CTDH.MaKichThuoc
+	WHERE MaDonHang = @MaDonHang
+END
+
+
+--Lọc (Tìm Kiếm) đơn hàng theo các điều kiện về mãDH, tênKH, Tình Trạng--
+CREATE PROC LocDonHang 
+    @MaDonHang INT = NULL, 
+    @TenKhachHang NVARCHAR(100) = NULL, 
+    @TinhTrang NVARCHAR(100) = NULL
+AS
+BEGIN
+    CREATE TABLE #ThongTinDonHang (
+        MaDonHang INT,
+        HoVaTen NVARCHAR(100),
+        NgayDat DATE,
+        DiaChiGiaoHang NVARCHAR(255),
+        ThanhTien DECIMAL(18, 2),
+        TrangThaiDonHang NVARCHAR(50)
+    );
+
+    -- Kiểm tra các tham số và xác định câu lệnh SQL phù hợp
+    IF @MaDonHang IS NOT NULL
+    BEGIN
+        -- Truy vấn với điều kiện MaDonHang
+        INSERT INTO #ThongTinDonHang (MaDonHang, HoVaTen, NgayDat, DiaChiGiaoHang, ThanhTien, TrangThaiDonHang)
+        SELECT 
+            DH.MaDonHang,
+            dbo.HoVaTen(KH.Ho, KH.Ten) AS HoVaTen,
+            DH.NgayDat,
+            DH.DiaChiGiaoHang,
+            SUM(CTDH.ThanhTien) AS ThanhTien,
+            DH.TrangThaiDonHang
+        FROM 
+            DonHang DH
+        JOIN 
+            KhachHang KH ON KH.MaKhachHang = DH.MaKhachHang
+        JOIN 
+            ChiTietDonHang CTDH ON CTDH.MaDonHang = DH.MaDonHang
+        WHERE 
+            CTDH.MaDonHang = @MaDonHang
+        AND 
+            (dbo.HoVaTen(KH.Ho, KH.Ten) = @TenKhachHang OR @TenKhachHang IS NULL)
+        AND 
+            (TrangThaiDonHang = @TinhTrang OR @TinhTrang IS NULL)
+        GROUP BY 
+            DH.MaDonHang, dbo.HoVaTen(KH.Ho, KH.Ten), DH.NgayDat, DH.DiaChiGiaoHang, DH.TrangThaiDonHang;
+    END
+    ELSE IF @TenKhachHang IS NOT NULL
+    BEGIN
+        -- Truy vấn với điều kiện TenKhachHang
+        INSERT INTO #ThongTinDonHang (MaDonHang, HoVaTen, NgayDat, DiaChiGiaoHang, ThanhTien, TrangThaiDonHang)
+        SELECT 
+            DH.MaDonHang,
+            dbo.HoVaTen(KH.Ho, KH.Ten) AS HoVaTen,
+            DH.NgayDat,
+            DH.DiaChiGiaoHang,
+            SUM(CTDH.ThanhTien) AS ThanhTien,
+            DH.TrangThaiDonHang
+        FROM 
+            DonHang DH
+        JOIN 
+            KhachHang KH ON KH.MaKhachHang = DH.MaKhachHang
+        JOIN 
+            ChiTietDonHang CTDH ON CTDH.MaDonHang = DH.MaDonHang
+        WHERE 
+            dbo.HoVaTen(KH.Ho, KH.Ten) = @TenKhachHang
+        AND 
+            (TrangThaiDonHang = @TinhTrang OR @TinhTrang IS NULL)
+        GROUP BY 
+            DH.MaDonHang, dbo.HoVaTen(KH.Ho, KH.Ten), DH.NgayDat, DH.DiaChiGiaoHang, DH.TrangThaiDonHang;
+    END
+    ELSE
+    BEGIN
+        -- Truy vấn với các điều kiện không xác định rõ
+        INSERT INTO #ThongTinDonHang (MaDonHang, HoVaTen, NgayDat, DiaChiGiaoHang, ThanhTien, TrangThaiDonHang)
+        SELECT 
+            DH.MaDonHang,
+            dbo.HoVaTen(KH.Ho, KH.Ten) AS HoVaTen,
+            DH.NgayDat,
+            DH.DiaChiGiaoHang,
+            SUM(CTDH.ThanhTien) AS ThanhTien,
+            DH.TrangThaiDonHang
+        FROM 
+            DonHang DH
+        JOIN 
+            KhachHang KH ON KH.MaKhachHang = DH.MaKhachHang
+        JOIN 
+            ChiTietDonHang CTDH ON CTDH.MaDonHang = DH.MaDonHang
+        WHERE 
+            (TrangThaiDonHang = @TinhTrang OR @TinhTrang IS NULL)
+        GROUP BY 
+            DH.MaDonHang, dbo.HoVaTen(KH.Ho, KH.Ten), DH.NgayDat, DH.DiaChiGiaoHang, DH.TrangThaiDonHang;
+    END
+
+    -- Xuất kết quả từ bảng tạm
+    SELECT * FROM #ThongTinDonHang;
+
+    -- Dọn dẹp bảng tạm
+    DROP TABLE #ThongTinDonHang;
+END
 
 -----------------------------------------------------------------------------------------------------------------------
 --1.	Stored Procedure: Thêm phiếu nhập hàng.

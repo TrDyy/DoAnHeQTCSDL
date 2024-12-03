@@ -11,7 +11,7 @@ namespace KETNOI
     public class DBConnect
     {
         public SqlConnection conn;
-        string connectionstring = "Data Source=NTDyy;Initial Catalog=DoAnHeQTCSDL02;Integrated Security=True";
+        string connectionstring = "Data Source=NTDyy;Initial Catalog=QuanLyShopQuanAo_HeQTCSDL;Integrated Security=True";
         DataTable dt = new DataTable();
         public DBConnect()
         {

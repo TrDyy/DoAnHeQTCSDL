@@ -293,13 +293,6 @@ namespace DOANHEQTCSDL
             return dt;
         }
 
-        private void btnXemPhieuNhap_Click(object sender, EventArgs e)
-        {
-            PhieuNhap gd = new PhieuNhap();
-            gd.FormClosed += (s, args) => this.Close();
-            gd.Show();
-            this.Hide();
-        }
 
 
     }
